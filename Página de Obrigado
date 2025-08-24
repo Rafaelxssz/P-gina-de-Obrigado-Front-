@@ -1,0 +1,180 @@
+!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Entrega do Pedido</title>
+
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '1065656982336045');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=1065656982336045&ev=PageView&noscript=1"
+/></noscript>
+<!-- End Meta Pixel Code -->
+
+<style>
+  body { 
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; 
+    margin: 40px; 
+  }
+  .card { 
+    max-width: 560px; 
+    margin: 0 auto; 
+    padding: 24px; 
+    border: 1px solid #e6e6e6; 
+    border-radius: 12px; 
+  }
+  button { 
+    padding: 14px 18px; 
+    border: 0; 
+    border-radius: 8px; 
+    font-weight: 600; 
+    cursor: pointer; 
+    text-decoration: none;
+    display: inline-block;
+  }
+  .cta { 
+    background: #111; 
+    color: #fff; 
+  }
+  .cta[disabled] { 
+    opacity: .6; 
+    cursor: not-allowed; 
+  }
+  .telegram-btn {
+    background: #0088cc;
+    color: #fff;
+    margin-top: 12px;
+    display: none;
+  }
+  .access-btn {
+    background: #28a745;
+    color: #fff;
+    margin-left: 10px;
+  }
+  .ok { 
+    color: #0a7f2e; 
+    margin-top: 12px; 
+    display:none; 
+  }
+  .warn { 
+    color: #c27d00; 
+    margin-top: 12px; 
+    display:none; 
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Obrigado pela compra!</h1>
+    <p>Para liberar seu acesso, clique abaixo. Confirmaremos sua compra (sem duplicar).</p>
+    <button id="btn" class="cta">Confirmar compra</button>
+    <a href="https://t.me/+XHH3GBrvlnwzYjkx" style="text-decoration: none;">
+      <button class="access-btn">Acessar produto</button>
+    </a>
+    <a href="https://t.me/+XHH3GBrvlnwzYjkx" id="telegramBtn" class="telegram-btn" style="text-decoration: none;">
+      <button class="telegram-btn">Acessar meu produto</button>
+    </a>
+    <div id="ok" class="ok">✔ Compra já confirmada neste dispositivo.</div>
+    <div id="warn" class="warn">⚠ Já registramos essa confirmação antes. O evento não será duplicado.</div>
+
+    <p style="margin-top:20px;font-size:.9rem;color:#666">
+      Este link foi marcado com <code>order_id</code> automaticamente.
+    </p>
+  </div>
+
+<script>
+(function(){
+  // ====== CONFIG ======
+  const DEFAULT_VALUE   = 0.00;       // valor da compra
+  const DEFAULT_CURRENCY = 'USD';     // moeda
+  // opcional: se quiser "separar" por produto, mude o NAMESPACE:
+  const ORDER_NS = 'order_id::' + location.pathname;
+
+  // --- gera um ID curto estável para este navegador/página e injeta na URL ---
+  function generateShortId(){
+    const ts = Date.now().toString(36);          // carimbo de tempo base36
+    const rnd = Math.random().toString(36).slice(2,8); // 6 chars aleatórios
+    return odr_${ts}${rnd};
+  }
+
+  function ensureOrderIdInUrl(){
+    const url = new URL(location.href);
+    const params = url.searchParams;
+
+    // já veio na URL? só usa.
+    let orderId = params.get('order_id') || params.get('oid') || params.get('tx');
+
+    // se não veio, busca no localStorage (1ª vez gera e persiste)
+    if (!orderId) {
+      orderId = localStorage.getItem(ORDER_NS);
+      if (!orderId) {
+        orderId = generateShortId();
+        localStorage.setItem(ORDER_NS, orderId);
+      }
+      // injeta na URL sem recarregar
+      params.set('order_id', orderId);
+      history.replaceState(null, '', url.pathname + '?' + params.toString() + url.hash);
+    }
+    return String(orderId);
+  }
+
+  const eventId = ensureOrderIdInUrl(); // usamos como event_id para dedupe Pixel/CAPI
+  const value   = DEFAULT_VALUE;
+  const currency= DEFAULT_CURRENCY;
+
+  // chave anti-duplicação local (mesmo usuário/navegador)
+  const DEDUPE_KEY = 'purchase_sent::' + eventId;
+
+  const $btn  = document.getElementById('btn');
+  const $telegramBtn = document.getElementById('telegramBtn');
+  const $ok   = document.getElementById('ok');
+  const $warn = document.getElementById('warn');
+
+  // se já enviou antes neste device, bloqueia
+  if (localStorage.getItem(DEDUPE_KEY) === '1') {
+    $btn.setAttribute('disabled', 'true');
+    $ok.style.display = 'block';
+    $telegramBtn.style.display = 'inline-block';
+  }
+
+  $btn.addEventListener('click', function(){
+    if (localStorage.getItem(DEDUPE_KEY) === '1') {
+      $warn.style.display = 'block';
+      return;
+    }
+
+    // dispara Purchase com eventID = order_id
+    fbq('track', 'Purchase',
+      { value: value, currency: currency },
+      { eventID: eventId }
+    );
+
+    // marca e desabilita
+    localStorage.setItem(DEDUPE_KEY, '1');
+    $btn.setAttribute('disabled', 'true');
+    $ok.style.display = 'block';
+    $telegramBtn.style.display = 'inline-block';
+
+    // (opcional) também envie para seu backend/CAPI usando o MESMO eventId
+    // fetch('/capi/purchase', { method:'POST', headers:{'Content-Type':'application/json'},
+    //   body: JSON.stringify({ event_id: eventId, value, currency,
+    //                          client_user_agent: navigator.userAgent,
+    //                          fbp: (document.cookie.match(/_fbp=([^;]+)/)||[])[1],
+    //                          fbc: (document.cookie.match(/_fbc=([^;]+)/)||[])[1] })});
+  });
+})();
+</script>
+</body>
+</html>
